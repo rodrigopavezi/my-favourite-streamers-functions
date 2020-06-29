@@ -4,8 +4,12 @@ const functions = require("firebase-functions");
 var admin = require("firebase-admin");
 const cookieParser = require("cookie-parser");
 const crypto = require("crypto");
-const cors = require("cors")({ origin: true, credentials: true });
+const cors = require("cors")({
+  origin: "https://my-favourite-streamers.firebaseapp.com",
+  credentials: true,
+});
 const request = require("request");
+const firebase = require("firebase");
 
 var serviceAccount = require("./service-account.json");
 const APP_NAME = "my-favourite-streamers";
@@ -55,6 +59,7 @@ exports.redirect = functions.https.onRequest((req, res) => {
         maxAge: 3600000,
         secure: true,
         httpOnly: true,
+        sameSite: "none",
       });
       const redirectUri = oauth2.authorizationCode.authorizeURL({
         redirect_uri: OAUTH_REDIRECT_URI,
@@ -262,8 +267,22 @@ exports.twitchStreamNotificationCallback = functions.https.onRequest(
         const data = req.body.data;
 
         const docRef = db.collection("events").doc(data[0].user_id);
+
+        const doc = await docRef.get();
+        let appendedEvents = [data[0]];
+        if (
+          doc &&
+          doc.data() &&
+          doc.data().events &&
+          doc.data().events.length > 0
+        ) {
+          appendedEvents = [...doc.data().events, ...appendedEvents];
+        }
+
         await docRef.set(
-          { events: firebase.firestore.FieldValue.arrayUnion(data[0]) },
+          {
+            events: appendedEvents,
+          },
           { merge: true }
         );
 
